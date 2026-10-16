@@ -44,6 +44,22 @@ The G-buffer color storage is 8 bytes per pixel instead of 20 bytes per pixel
 (two `rgba16float` images plus one `rgba8unorm` image), a 60% reduction. This
 does not include the unchanged depth attachment.
 
+#### Compute bloom post-processing
+
+The clustered deferred path keeps its lighting result in an HDR `rgba16float`
+texture, then runs two compute passes for bloom. The first downsamples to half
+resolution and extracts pixels above a luminance threshold. The second applies
+a 3x3 Gaussian-weighted blur to that bright image and adds the result to the
+full-resolution scene before writing to the canvas. Bloom uses a fixed
+0.65 luminance threshold and 1.5 composite strength.
+
+The reduced-resolution bright texture keeps the blur taps and bandwidth lower
+than a full-resolution blur. Bloom adds two compute dispatches and intermediate
+texture traffic, so it may cost performance in scenes with few bright pixels;
+the benefit is a soft glow around bright lighting. The in-app benchmark's
+clustered-deferred results include the bloom passes. Compare with a build where
+bloom is disabled to measure its cost on the target GPU.
+
 #### Automated benchmark
 
 The in-app **Renderer benchmark** runs the naive, Forward+, and clustered

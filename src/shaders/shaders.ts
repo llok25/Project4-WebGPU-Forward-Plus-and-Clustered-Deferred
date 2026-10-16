@@ -9,6 +9,8 @@ import forwardPlusFragRaw from './forward_plus.fs.wgsl?raw';
 
 import clusteredDeferredFragRaw from './clustered_deferred.fs.wgsl?raw';
 import clusteredDeferredLightingComputeRaw from './clustered_deferred_lighting.cs.wgsl?raw';
+import bloomDownsampleComputeRaw from './bloom_downsample.cs.wgsl?raw';
+import bloomCompositeComputeRaw from './bloom_composite.cs.wgsl?raw';
 
 import moveLightsComputeRaw from './move_lights.cs.wgsl?raw';
 import clusteringComputeRaw from './clustering.cs.wgsl?raw';
@@ -31,6 +33,7 @@ export const constants = {
     clusterDepthSlices: 16,
     maxLightsPerCluster: 128,
     deferredWorkgroupSize: 8,
+    canvasStorageFormat: "rgba8unorm",
 
     lightRadius: 2
 };
@@ -65,6 +68,8 @@ export const forwardPlusFragSrc: string = processShaderRaw(forwardPlusFragRaw);
 
 export const clusteredDeferredFragSrc: string = processShaderRaw(clusteredDeferredFragRaw);
 export const clusteredDeferredLightingComputeSrc: string = processShaderRaw(clusteredDeferredLightingComputeRaw);
+export const bloomDownsampleComputeSrc: string = processShaderRaw(bloomDownsampleComputeRaw);
+export const bloomCompositeComputeSrc: string = processShaderRaw(bloomCompositeComputeRaw);
 
 export const moveLightsComputeSrc: string = processShaderRaw(moveLightsComputeRaw);
 export const clusteringComputeSrc: string = processShaderRaw(clusteringComputeRaw);

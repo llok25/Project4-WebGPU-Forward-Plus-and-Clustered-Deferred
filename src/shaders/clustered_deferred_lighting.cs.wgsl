@@ -3,7 +3,7 @@
 @group(0) @binding(2) var<storage, read> lightSet: LightSet;
 @group(0) @binding(3) var<storage, read> clusterSet: ClusterSet;
 @group(0) @binding(4) var<uniform> cameraUniforms: CameraUniforms;
-@group(0) @binding(5) var outputTexture: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(5) var outputTexture: texture_storage_2d<rgba16float, write>;
 
 const TILE_SIZE = ${clusterTileSize}u;
 const DEPTH_SLICES = ${clusterDepthSlices}u;
