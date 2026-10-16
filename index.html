@@ -10,6 +10,27 @@
 
   <body>
     <canvas id="mainCanvas"></canvas>
+    <section id="benchmark-panel" aria-label="Renderer benchmark">
+      <h2>Renderer benchmark</h2>
+      <label>
+        Build label
+        <input id="benchmark-version" type="text" value="working-tree">
+      </label>
+      <label>
+        Warm-up (seconds)
+        <input id="benchmark-warmup" type="number" value="3" min="0" max="60" step="1">
+      </label>
+      <label>
+        Samples per renderer
+        <input id="benchmark-samples" type="number" value="300" min="10" max="10000" step="10">
+      </label>
+      <div class="benchmark-actions">
+        <button id="benchmark-start" type="button">Benchmark all</button>
+        <button id="benchmark-stop" type="button" disabled>Stop</button>
+        <button id="benchmark-download" type="button" disabled>Download CSV</button>
+      </div>
+      <output id="benchmark-status" aria-live="polite">Ready</output>
+    </section>
     <script type="module" src="./src/main.ts"></script>
   </body>
 </html>

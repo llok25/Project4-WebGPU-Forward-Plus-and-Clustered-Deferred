@@ -3,11 +3,15 @@ import { toRadians } from "../math_util";
 import { device, canvas, fovYDegrees, aspectRatio } from "../renderer";
 
 class CameraUniforms {
-    readonly buffer = new ArrayBuffer(16 * 4 * 2 + 16 * 2);
+    readonly buffer = new ArrayBuffer(16 * 4 * 3 + 16 * 2);
     private readonly floatView = new Float32Array(this.buffer);
 
     set viewProjMat(mat: Float32Array) {
         this.floatView.set(mat, 0);
+    }
+
+    set invViewProjMat(mat: Float32Array) {
+        this.floatView.set(mat, 32);
     }
 
     set viewMat(mat: Float32Array) {
@@ -15,11 +19,11 @@ class CameraUniforms {
     }
 
     set viewportAndProjection(values: Float32Array) {
-        this.floatView.set(values, 32);
+        this.floatView.set(values, 48);
     }
 
     set depthRange(values: Float32Array) {
-        this.floatView.set(values, 36);
+        this.floatView.set(values, 52);
     }
 }
 
@@ -139,6 +143,7 @@ export class Camera {
         const viewMat = mat4.lookAt(this.cameraPos, lookPos, [0, 1, 0]);
         const viewProjMat = mat4.mul(this.projMat, viewMat);
         this.uniforms.viewProjMat = viewProjMat;
+        this.uniforms.invViewProjMat = mat4.invert(viewProjMat);
         this.uniforms.viewMat = viewMat;
         this.uniforms.viewportAndProjection = new Float32Array([
             canvas.width,

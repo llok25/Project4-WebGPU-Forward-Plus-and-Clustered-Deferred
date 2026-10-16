@@ -30,3 +30,58 @@ to implementation work. Complete the implementation early to leave time!
 - [dat.GUI](https://github.com/dataarts/dat.gui)
 - [stats.js](https://github.com/mrdoob/stats.js)
 - [wgpu-matrix](https://github.com/greggman/wgpu-matrix)
+
+### Part 2: Clustered Deferred G-buffer Optimization
+
+The clustered deferred renderer packs an octahedrally encoded world normal and
+8-bit RGB albedo into two `u32` channels in a single `rg32uint` G-buffer image.
+The lighting compute shader reads that image and the depth attachment, rebuilds
+world position with the inverse view-projection matrix, and writes the lit
+result directly to the canvas. This replaces the three color G-buffer images
+and fullscreen vertex/fragment lighting pass.
+
+The G-buffer color storage is 8 bytes per pixel instead of 20 bytes per pixel
+(two `rgba16float` images plus one `rgba8unorm` image), a 60% reduction. This
+does not include the unchanged depth attachment.
+
+#### Automated benchmark
+
+The in-app **Renderer benchmark** runs the naive, Forward+, and clustered
+deferred renderers in sequence. It discards the configured warm-up period,
+collects the requested number of frame samples per renderer, and exports a CSV.
+Each row includes the build label, renderer, light count, canvas resolution,
+browser user agent, frame interval, and CPU draw/submit duration. The default
+is a 3-second warm-up and 300 samples per renderer.
+
+Frame interval is measured between animation frames and includes browser
+scheduling/vsync. CPU draw/submit measures JavaScript command encoding and
+submission; it does **not** measure asynchronous GPU execution. Use browser GPU
+profiling or GPU timestamp queries separately when actual GPU-only timings are
+required. The tool reports milliseconds, not FPS.
+
+For comparable runs, keep the browser/GPU, canvas size, camera position, light
+count, and power mode constant; avoid interacting with the page and keep it
+foregrounded. Enter a distinct build label for each revision (for example,
+`baseline` and `compact-compute`) and download each CSV.
+
+Install the plotting dependency and plot one or more exported CSVs:
+
+```powershell
+python -m pip install matplotlib
+python scripts/plot_benchmark.py baseline.csv compact-compute.csv --output benchmark-results.png
+```
+
+The script prints sample count, mean, median, and 95th percentile in
+milliseconds, and plots median plus interquartile range for both frame interval
+and CPU draw/submit duration.
+
+#### Performance measurements
+
+No target-machine benchmark data has been collected yet. The CSV exports and
+plot provide the measurements; do not treat the G-buffer memory reduction
+below as a render-time result.
+
+| Version | G-buffer color storage | Average GPU frame time (ms) | Median GPU frame time (ms) |
+| --- | ---: | ---: | ---: |
+| Original clustered deferred | 20 B/pixel | Not measured | Not measured |
+| Compact G-buffer + compute | 8 B/pixel | Not measured | Not measured |

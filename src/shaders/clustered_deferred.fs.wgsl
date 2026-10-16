@@ -8,9 +8,16 @@ struct FragmentInput {
 }
 
 struct GBufferOutput {
-    @location(0) pos: vec4f,
-    @location(1) nor: vec4f,
-    @location(2) albedo: vec4f
+    @location(0) data: vec2u
+}
+
+fn encodeOctahedralNormal(normal: vec3f) -> vec2f {
+    let projected = normal / (abs(normal.x) + abs(normal.y) + abs(normal.z));
+    var oct = projected.xy;
+    if (projected.z < 0.f) {
+        oct = (1.f - abs(oct.yx)) * select(vec2f(-1.f), vec2f(1.f), oct >= vec2f(0.f));
+    }
+    return oct;
 }
 
 @fragment
@@ -21,8 +28,9 @@ fn main(in: FragmentInput) -> GBufferOutput {
     }
 
     var out: GBufferOutput;
-    out.pos = vec4f(in.pos, 1.f);
-    out.nor = vec4f(normalize(in.nor), 1.f);
-    out.albedo = vec4f(diffuseColor.rgb, 1.f);
+    out.data = vec2u(
+        pack2x16snorm(encodeOctahedralNormal(normalize(in.nor))),
+        pack4x8unorm(vec4f(diffuseColor.rgb, 1.f))
+    );
     return out;
 }

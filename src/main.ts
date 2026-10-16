@@ -10,6 +10,7 @@ import { setupLoaders, Scene } from './stage/scene';
 import { Lights } from './stage/lights';
 import { Camera } from './stage/camera';
 import { Stage } from './stage/stage';
+import { RendererBenchmark } from './benchmark';
 
 await initWebGPU();
 setupLoaders();
@@ -32,6 +33,9 @@ gui.add(lights, 'numLights').min(1).max(Lights.maxNumLights).step(1).onChange(()
 const stage = new Stage(scene, lights, camera, stats);
 
 var renderer: Renderer | undefined;
+let benchmarkMetricsListener:
+    | ((mode: string, metrics: { frameIntervalMs: number; cpuSubmitMs: number }) => void)
+    | undefined;
 
 function setRenderer(mode: string) {
     renderer?.stop();
@@ -46,11 +50,24 @@ function setRenderer(mode: string) {
         case renderModes.clusteredDeferred:
             renderer = new ClusteredDeferredRenderer(stage);
             break;
+        default:
+            throw new Error(`Unknown renderer mode: ${mode}`);
     }
+
+    renderer.onFrameMetrics = metrics => benchmarkMetricsListener?.(mode, metrics);
 }
 
 const renderModes = { naive: 'naive', forwardPlus: 'forward+', clusteredDeferred: 'clustered deferred' };
+const rendererModes = Object.values(renderModes);
 let renderModeController = gui.add({ mode: renderModes.naive }, 'mode', renderModes);
 renderModeController.onChange(setRenderer);
 
 setRenderer(renderModeController.getValue());
+
+new RendererBenchmark(
+    mode => renderModeController.setValue(mode),
+    () => renderModeController.getValue(),
+    listener => { benchmarkMetricsListener = listener; },
+    lights,
+    rendererModes
+);

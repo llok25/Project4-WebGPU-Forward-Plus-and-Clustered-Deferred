@@ -41,13 +41,20 @@ export async function initWebGPU() {
         throw new Error("no appropriate GPUAdapter found");
     }
 
-    device = await adapter.requestDevice();
+    const supportsBgraStorage = adapter.features.has("bgra8unorm-storage");
+    device = await adapter.requestDevice({
+        requiredFeatures: supportsBgraStorage ? ["bgra8unorm-storage"] : []
+    });
 
     context = canvas.getContext("webgpu")!;
     canvasFormat = navigator.gpu.getPreferredCanvasFormat();
+    if (canvasFormat === "bgra8unorm" && !supportsBgraStorage) {
+        canvasFormat = "rgba8unorm";
+    }
     context.configure({
         device: device,
         format: canvasFormat,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.STORAGE_BINDING,
     });
 
     console.log("WebGPU init successsful");
@@ -110,6 +117,7 @@ export abstract class Renderer {
 
     private prevTime: number = 0;
     private frameRequestId: number;
+    onFrameMetrics: ((metrics: { frameIntervalMs: number; cpuSubmitMs: number }) => void) | undefined;
 
     constructor(stage: Stage) {
         this.scene = stage.scene;
@@ -138,9 +146,18 @@ export abstract class Renderer {
 
         this.stats.begin();
 
+        const drawStart = performance.now();
         this.draw();
+        const cpuSubmitMs = performance.now() - drawStart;
 
         this.stats.end();
+
+        if (this.prevTime !== 0) {
+            this.onFrameMetrics?.({
+                frameIntervalMs: deltaTime,
+                cpuSubmitMs
+            });
+        }
 
         this.prevTime = time;
         this.frameRequestId = requestAnimationFrame((t) => this.onFrame(t));
