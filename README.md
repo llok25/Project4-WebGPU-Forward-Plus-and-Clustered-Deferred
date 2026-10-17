@@ -16,23 +16,29 @@ https://llok25.github.io/Project4-WebGPU-Forward-Plus-and-Clustered-Deferred/
 
 https://github.com/user-attachments/assets/0ea65a03-dcf8-42ba-897a-fa2212da1541
 
+## Overview
+ 
+This project renders the Sponza atrium lit by thousands of dynamic point lights using three techniques, switchable from the GUI:
+ 
+* **Naive forward**: every fragment loops over every light.
+* **Forward+**: lights are binned into a 3D grid of view-space clusters by a compute shader, and each fragment only evaluates the lights in its cluster.
+* **Clustered Deferred**: reuses the same clustering, but writes a G-buffer first and does lighting in a separate fullscreen pass, so each pixel is shaded exactly once.
+## Features implemented
+**Base**
+* Naive renderer: camera view-projection buffer, bind groups and shaders.
+* Forward+ renderer: compute-shader light clustering with per-cluster light counts and index lists, and per-fragment lookup in the shading pass.
+* Clustered Deferred renderer: G-buffer geometry pass plus a fullscreen lighting pass reusing the Forward+ clustering.
 
-### (TODO: Your README)
+**Extra credit**
+* **Depth prepass for Forward+**: depth-only prepass, reused so the lighting pass shades only visible fragments (overdraw-free shading).
+* **Depth-based cluster culling**: a pass after the prepass that marks clusters containing visible geometry, which the clustering step then uses.
+* **Render bundles**: static draw calls recorded once and replayed, toggleable from the GUI.
 
-*DO NOT* leave the README to the last minute! It is a crucial part of the
-project, and we will not be able to grade you without a good README.
+**Tooling**
+* In-app benchmark that exports per-frame frame-interval, CPU submit time, and per-pass GPU times to CSV. All numbers below come from this.
 
-This assignment has a considerable amount of performance analysis compared
-to implementation work. Complete the implementation early to leave time!
 
-### Credits
-
-- [Vite](https://vitejs.dev/)
-- [loaders.gl](https://loaders.gl/)
-- [dat.GUI](https://github.com/dataarts/dat.gui)
-- [stats.js](https://github.com/mrdoob/stats.js)
-- [wgpu-matrix](https://github.com/greggman/wgpu-matrix)
-
+## Performance analysis
 
 ### Forward+ vs clustered deferred
 
@@ -308,3 +314,11 @@ To recreate the dedicated sweep charts:
 ```powershell
 python scripts/plot_benchmark_sweeps.py --light-sweep result\renderer-light-sweep.csv --depth-csv result\renderer-depth-comparison.csv --bundles-csv result\renderer-bundles-comparison.csv --output-dir result
 ```
+
+### Credits
+
+- [Vite](https://vitejs.dev/)
+- [loaders.gl](https://loaders.gl/)
+- [dat.GUI](https://github.com/dataarts/dat.gui)
+- [stats.js](https://github.com/mrdoob/stats.js)
+- [wgpu-matrix](https://github.com/greggman/wgpu-matrix)
