@@ -292,6 +292,24 @@ be rechecked on the target system.
 ![Renderer frame interval 500 lights](./img/forwardplus_depth_frame_interval.png)
 ![Renderer frame interval 500 lights](./img/forwardplus_depth_cpu_submit.png)
 
+### Debug views
+ 
+#### Cluster light-count heatmap
+ 
+![Cluster light-count heatmap](./img/debug-cluster-light-count.png)
+ 
+- Each screen-space cluster is colored by how many lights overlap it: blue is 0 lights and red is 129+ (the cluster cap, where lists overflow). Only visible surfaces are shown.
+- Every cluster here is blue to cyan. Judging by position on the legend, that is roughly 15–40 lights per cluster, and nothing approaches yellow or red, so **no cluster comes near the cap and no light lists are being truncated.**
+- **How it correlates with performance:** the cost of the lighting pass is the sum over pixels of the lights in that pixel's cluster, so the brighter cyan central columns are where most lighting time is spent. Cost per light rises as lists fill up and then flattens (section 1). More lights shifts the whole image toward green, then yellow.
+- The same view also shows why depth-based cluster culling gained nothing: the visible surfaces cover essentially every cluster column, leaving few empty clusters to skip.
+#### Overdraw
+ 
+![Overdraw](./img/debug-overdraw.png)
+ 
+- Brighter pixels mean more rasterized layers, excluding alpha cutouts. The floor is darkest, while the arcades, columns, and curtains where geometry overlaps along the view direction are brightest.
+- **How it correlates with performance:** with no prepass, each layer pays for the full light loop, so Forward+'s shading cost scales with this image's brightness. Most of the frame is mid-gray or brighter rather than black, which fits the measured 3.2–3.5× drop in shading time when the prepass collapses it to one layer per pixel.
+- Deferred is unaffected by overdraw, since the lighting pass runs once per pixel, which is why it needs no prepass.
+
 #### Automated benchmark
 
 The in-app **Renderer benchmark** runs the naive, Forward+, and clustered
