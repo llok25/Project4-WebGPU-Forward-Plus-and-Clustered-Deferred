@@ -82,7 +82,7 @@ where the new timestamped light sweep below overlaps.
 | 5,000 | Forward+ | 152.660 | 151.600 | 0.197 | 0.200 |
 | 5,000 | Clustered deferred | 98.753 | 97.000 | 0.281 | 0.300 |
 
-![Measured Forward+ and clustered deferred timings by active light count](./img/renderer-comparison.png)
+![Measured Forward+ and clustered deferred timings by active light count](./img/renderer_frame_interval_500_lights.png)
 
 The plotted frame interval is the time between animation frames, not a GPU
 timestamp. At 500 lights both renderers sit at about 6.1 ms, likely the
