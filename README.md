@@ -4,12 +4,12 @@ WebGL Forward+ and Clustered Deferred Shading
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 4**
 
 * Sau Lok Li
-* Tested on: (TODO) **Google Chrome 222.2** on
-  Windows 22, i7-2222 @ 2.22GHz 22GB, GTX 222 222MB (Moore 2222 Lab)
+* Tested on: **Google Chrome 155.0.8059.80** on
+  Windows 11, AMD Ryzen 9 270 w/ Radeon 780M Graphics, NVIDIA GeForce RTX 5070 Laptop GPU (8151 MiB), driver 596.13
 
 ### Live Demo
 
-[![](img/thumb.png)](http://TODO.github.io/Project4-WebGPU-Forward-Plus-and-Clustered-Deferred)
+[![](img/thumb.png)](https://llok25.github.io/Project4-WebGPU-Forward-Plus-and-Clustered-Deferred/)
 
 ### Demo Video/GIF
 
@@ -295,3 +295,4 @@ milliseconds, and plots median plus interquartile range for both frame interval
 and CPU draw/submit duration. It groups data by build label, renderer, bundle
 state, and Forward+ depth optimization state, so enabled and disabled runs can
 be compared in one plot.
+
