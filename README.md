@@ -51,7 +51,7 @@ This project renders the Sponza atrium lit by thousands of dynamic point lights 
 | Forward+ | 17.6 | 18.1 | 36.4 | 60.7 | 55.3 |
 | Clustered Deferred | 11.5 | 12.0 | 24.2 | 30.4 | 83.3 |
 
-![Renderer frame interval 500 lights](.img/renderer_frame_interval_500_lights.png)
+![Renderer frame interval 500 lights](./img/renderer_frame_interval_500_lights.png)
  
 ## Analysis
  
