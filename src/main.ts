@@ -19,6 +19,29 @@ import { Camera } from './stage/camera';
 import { Stage } from './stage/stage';
 import { RendererBenchmark } from './benchmark';
 
+const benchmarkPanel = document.querySelector<HTMLElement>('#benchmark-panel')!;
+const benchmarkHideButton = document.querySelector<HTMLButtonElement>('#benchmark-hide')!;
+const setBenchmarkVisibility = (visible: boolean) => {
+    benchmarkPanel.hidden = !visible;
+    benchmarkPanel.setAttribute('aria-hidden', String(!visible));
+};
+benchmarkHideButton.addEventListener('click', () => setBenchmarkVisibility(false));
+window.addEventListener('keydown', event => {
+    if (
+        event.repeat ||
+        event.key.toLowerCase() !== 'b' ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement ||
+        event.target instanceof HTMLSelectElement ||
+        (event.target instanceof HTMLElement && event.target.isContentEditable)
+    ) {
+        return;
+    }
+    setBenchmarkVisibility(benchmarkPanel.hidden);
+});
+
 await initWebGPU();
 setupLoaders();
 

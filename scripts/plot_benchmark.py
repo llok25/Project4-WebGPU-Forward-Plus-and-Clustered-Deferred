@@ -43,7 +43,8 @@ def read_files(paths):
                     raise ValueError(f"{path}:{line_number}: version and mode cannot be blank")
                 bundle_state = (row.get("render_bundles") or "unspecified").strip() or "unspecified"
                 depth_state = (row.get("forward_plus_depth") or "unspecified").strip() or "unspecified"
-                key = (version, mode, bundle_state, depth_state)
+                num_lights = (row.get("num_lights") or "unspecified").strip() or "unspecified"
+                key = (version, mode, bundle_state, depth_state, num_lights)
                 for metric, _ in METRICS:
                     try:
                         value = float(row[metric])
@@ -71,12 +72,13 @@ def main():
     except (OSError, csv.Error, ValueError) as error:
         parser.error(str(error))
 
-    print("Version | Renderer | Bundles | Forward+ depth | Metric | Samples | Mean | Median | P95 (ms)")
-    for version, mode, bundle_state, depth_state in sorted(groups):
+    print("Version | Renderer | Lights | Bundles | Forward+ depth | Metric | Samples | Mean | Median | P95 (ms)")
+    for version, mode, bundle_state, depth_state, num_lights in sorted(groups):
         for metric, label in METRICS:
-            values = groups[(version, mode, bundle_state, depth_state)][metric]
+            values = groups[(version, mode, bundle_state, depth_state, num_lights)][metric]
             print(
-                f"{version} | {mode} | {bundle_state} | {depth_state} | {label} | {len(values)} | "
+                f"{version} | {mode} | {num_lights} | {bundle_state} | {depth_state} | "
+                f"{label} | {len(values)} | "
                 f"{statistics.fmean(values):.3f} | {statistics.median(values):.3f} | "
                 f"{percentile(values, 0.95):.3f}"
             )
@@ -87,11 +89,11 @@ def main():
         print("Install matplotlib to create the plot: python -m pip install matplotlib", file=sys.stderr)
         return 2
 
-    versions = sorted({version for version, _, _, _ in groups})
+    versions = sorted({version for version, _, _, _, _ in groups})
     combinations = sorted(groups)
     labels = [
-        f"{version}\n{mode}\nBundles: {bundle_state}\nDepth: {depth_state}"
-        for version, mode, bundle_state, depth_state in combinations
+        f"{version}\n{mode}\n{num_lights} lights\nBundles: {bundle_state}\nDepth: {depth_state}"
+        for version, mode, bundle_state, depth_state, num_lights in combinations
     ]
     colors_by_version = {version: f"C{index % 10}" for index, version in enumerate(versions)}
     hatches = {"enabled": "", "disabled": "///", "unsupported": "..."}
@@ -103,8 +105,8 @@ def main():
         upper_errors = []
         colors = []
         metric_hatches = []
-        for version, mode, bundle_state, depth_state in combinations:
-            values = groups[(version, mode, bundle_state, depth_state)][metric]
+        for version, mode, bundle_state, depth_state, num_lights in combinations:
+            values = groups[(version, mode, bundle_state, depth_state, num_lights)][metric]
             q1 = percentile(values, 0.25)
             median = statistics.median(values)
             q3 = percentile(values, 0.75)

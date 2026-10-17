@@ -29,6 +29,8 @@ export class RendererBenchmark {
     private readonly versionInput = document.querySelector<HTMLInputElement>('#benchmark-version')!;
     private readonly warmupInput = document.querySelector<HTMLInputElement>('#benchmark-warmup')!;
     private readonly samplesInput = document.querySelector<HTMLInputElement>('#benchmark-samples')!;
+    private readonly rendererSetSelect =
+        document.querySelector<HTMLSelectElement>('#benchmark-renderer-set')!;
 
     private readonly rows: BenchmarkRow[] = [];
     private readonly modeSummaries: string[] = [];
@@ -124,6 +126,13 @@ export class RendererBenchmark {
         }
 
         const previousMode = this.getMode();
+        const selectedModes = this.rendererSetSelect.value === 'forward-deferred'
+            ? this.modes.filter(mode => mode !== 'naive')
+            : this.modes;
+        if (selectedModes.length === 0) {
+            this.status.value = 'Choose at least one renderer to benchmark.';
+            return;
+        }
         this.currentVersion = version;
         this.modeSummaries.length = 0;
         this.warmupMs = warmupSeconds * 1000;
@@ -136,7 +145,7 @@ export class RendererBenchmark {
         this.setMetricsListener((mode, metrics) => this.onFrame(mode, metrics));
 
         try {
-            for (const mode of this.modes) {
+            for (const mode of selectedModes) {
                 if (!this.running) {
                     break;
                 }
@@ -188,7 +197,10 @@ export class RendererBenchmark {
             const describe = (key: 'frame_interval_ms' | 'cpu_submit_ms') => {
                 const values = this.activeRows.map(row => row[key]).sort((a, b) => a - b);
                 const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-                const median = values[Math.floor(values.length / 2)];
+                const middle = Math.floor(values.length / 2);
+                const median = values.length % 2 === 0
+                    ? (values[middle - 1] + values[middle]) / 2
+                    : values[middle];
                 return `mean ${mean.toFixed(3)} ms, median ${median.toFixed(3)} ms`;
             };
             const latest = this.activeRows[this.activeRows.length - 1];

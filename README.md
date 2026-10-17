@@ -3,7 +3,7 @@ WebGL Forward+ and Clustered Deferred Shading
 
 **University of Pennsylvania, CIS 565: GPU Programming and Architecture, Project 4**
 
-* (TODO) YOUR NAME HERE
+* Sau Lok Li
 * Tested on: (TODO) **Google Chrome 222.2** on
   Windows 22, i7-2222 @ 2.22GHz 22GB, GTX 222 222MB (Moore 2222 Lab)
 
@@ -31,6 +31,131 @@ to implementation work. Complete the implementation early to leave time!
 - [stats.js](https://github.com/mrdoob/stats.js)
 - [wgpu-matrix](https://github.com/greggman/wgpu-matrix)
 
+## Performance Analysis
+
+### Forward+ vs clustered deferred
+
+I compared the current implementations at 500, 2,000, and 5,000 moving point
+lights with the same Sponza view, 1058x567 canvas, 3-second warm-up, and 200
+samples per renderer. Render bundles were enabled for both. Forward+ depth
+prepass and depth-based cluster culling were enabled for Forward+. Clustered
+deferred includes compact G-buffer compute shading and bloom. The browser was
+Chrome 150 embedded in VS Code/Electron 43.7.7; GPU model and driver were not
+recorded, so these measurements are environment-specific.
+
+| Lights | Renderer | Frame interval mean (ms) | Frame interval median (ms) | CPU draw/submit mean (ms) | CPU draw/submit median (ms) |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 500 | Forward+ | 6.060 | 6.100 | 0.104 | 0.100 |
+| 500 | Clustered deferred | 6.060 | 6.100 | 0.176 | 0.200 |
+| 2,000 | Forward+ | 55.515 | 54.500 | 0.210 | 0.200 |
+| 2,000 | Clustered deferred | 37.363 | 36.400 | 0.310 | 0.300 |
+| 5,000 | Forward+ | 152.660 | 151.600 | 0.197 | 0.200 |
+| 5,000 | Clustered deferred | 98.753 | 97.000 | 0.281 | 0.300 |
+
+![Measured Forward+ and clustered deferred timings by active light count](./img/renderer-comparison.png)
+
+The plotted frame interval is the time between animation frames, not a GPU
+timestamp. At 500 lights both renderers sit at about 6.1 ms, likely the
+foreground frame-scheduling/display floor; the measurement does not establish a
+GPU speed difference there. At 2,000 and 5,000 lights, clustered deferred's
+median frame interval was respectively 33.2% and 36.0% lower than Forward+'s in
+this run. This suggests clustered deferred handled this high-light workload
+better in this scene. It should not be generalized to all hardware or scenes:
+frame intervals include browser scheduling and queue behavior, and the two
+renderers do different extra work (Forward+ prepass/culling vs deferred
+G-buffer/compute/bloom).
+
+The archived 200-sample summaries were generated before the benchmark's
+even-sample median calculation was corrected to average the two middle
+observations. The displayed historical medians use the upper middle sample and
+can differ from a conventional median by up to one sample step; new benchmark
+runs use the conventional even-sample median. The original per-frame samples
+for these aggregated results were not retained.
+
+The CPU draw/submit duration shows the tradeoff in host-side work: Forward+
+recorded about 0.1-0.2 ms per frame, while clustered deferred recorded
+0.2-0.3 ms. Deferred has separate geometry, lighting, and bloom passes; its
+extra JavaScript command setup does not translate directly to more elapsed
+frame time at high light counts. Render bundles reduce repeated scene draw
+encoding in both paths, but do not remove compute or pixel shading work.
+
+Forward+ is attractive for low/moderate light counts, limited render-target
+bandwidth, or scenes with less overdraw. It shades geometry directly and does
+not write/read a G-buffer. Its fragment lighting cost follows visible shaded
+fragments and can rise with overdraw; the optional depth optimization adds a
+geometry pass and a per-pixel cluster mask pass. Clustered deferred pays for
+G-buffer writes/reads and world-position reconstruction, but shades only the
+visible surface and separates geometry from lighting. It can win when
+overdraw or light-count shading cost dominates; its extra passes and memory
+traffic can be a loss when the scene is simple or bandwidth-limited. This
+implementation additionally runs bloom, so this comparison is of the complete
+current renderers rather than a pure apples-to-apples shading kernel test.
+
+The renderer shaders index the light array one light at a time; they do not
+copy the full light array or a large per-cluster array into a local variable.
+No WGSL pointer rewrite was needed. A more definitive GPU comparison would use
+timestamp queries (where supported) and vary overdraw, resolution, and light
+count independently.
+
+### Optimization/effect measurements and tradeoffs
+
+The G-buffer change reduces color storage from 20 B/pixel (two `rgba16float`
+images plus one `rgba8unorm` image) to 8 B/pixel in one `rg32uint` image, a
+60% reduction in that part of the G-buffer. It also replaces the fullscreen
+rendering pass with compute shading and reconstructs world position from
+depth. The current benchmark compares the complete renderer, not the old and
+new G-buffer implementations in isolation; no before/after timing claim is
+made for this change.
+
+Bloom adds a half-resolution bright extraction and blur/composite compute
+dispatch. It costs additional dispatch and texture bandwidth and can be most
+noticeable at high resolutions; the half-resolution bright texture limits
+that cost. No bloom-off comparison was captured, so the specific effect cost
+is not quantified yet.
+
+For Forward+ depth prepass plus depth-based culling, the 500-light test used
+200 samples after a 2-second warm-up with the same 1058x567 canvas and render
+bundles enabled:
+
+| Forward+ path | Frame interval mean (ms) | Frame interval median (ms) | CPU draw/submit mean (ms) | CPU draw/submit median (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| Single pass, no depth culling | 6.394 | 6.100 | 0.157 | 0.200 |
+| Depth prepass + cluster mask | 6.060 | 6.100 | 0.122 | 0.100 |
+
+This run shows no median frame-interval change at 500 lights. The mask pass
+marks clusters touched by visible pixels; clustering skips inactive clusters
+but retains the same dispatch count (no stream compaction). It should help most
+when many clusters are empty and/or overdraw is high, and less when most
+clusters are active or light counts are low. At higher light counts it avoids
+cluster/light tests for inactive clusters and the depth-equal final pass avoids
+shading occluded fragments. The extra prepass, fullscreen mask, atomics, and
+mask clear can outweigh these savings in sparse/low-light cases. The light
+scaling comparison above uses this optimized Forward+ path.
+
+Render bundles target CPU draw-call overhead only. A 10-sample, zero-warm-up
+smoke comparison at 500 lights showed the following CPU draw/submit medians
+(off to on); the sample is too small and noisy for a performance conclusion:
+
+| Renderer | Bundles off (ms) | Bundles on (ms) | Frame interval median off → on (ms) |
+| --- | ---: | ---: | ---: |
+| Forward+ | 0.200 | 0.100 | 9.100 → 21.100 |
+| Clustered deferred | 0.250 | 0.150 | 6.100 → 6.100 |
+
+The CPU trend is consistent with reducing host command encoding, but the frame
+interval variation demonstrates why a warmed-up, repeated run is needed. The
+best case is many stable draw calls with a CPU-bound renderer; the worst is a
+small or GPU-bound scene. Bundles do not reduce GPU shading work and need
+re-recording if bound geometry/material resources change.
+
+The aggregated light-scaling data and plotting script are available at
+[renderer-comparison.csv](./results/renderer-comparison.csv) and
+[plot_renderer_comparison.py](./scripts/plot_renderer_comparison.py). To
+recreate the graph:
+
+```powershell
+py -3.12 scripts\plot_renderer_comparison.py results\renderer-comparison.csv --output results\renderer-comparison.png
+```
+
 ### Part 2: Clustered Deferred G-buffer Optimization
 
 The clustered deferred renderer packs an octahedrally encoded world normal and
@@ -57,8 +182,8 @@ The reduced-resolution bright texture keeps the blur taps and bandwidth lower
 than a full-resolution blur. Bloom adds two compute dispatches and intermediate
 texture traffic, so it may cost performance in scenes with few bright pixels;
 the benefit is a soft glow around bright lighting. The in-app benchmark's
-clustered-deferred results include the bloom passes. Compare with a build where
-bloom is disabled to measure its cost on the target GPU.
+clustered-deferred results include the bloom passes. Its isolated timing has
+not yet been captured; see the performance analysis above.
 
 #### Render bundles
 
@@ -78,12 +203,14 @@ the saved CPU work is negligible; bundle recording also costs setup time and
 the scene must be re-recorded if its draw structure or bound resources change.
 
 To measure the effect, leave the scene, light count, resolution, browser, and
-build label unchanged. Run **Benchmark all** with render bundles enabled, then
-disabled, and download the CSV. Rows contain a `render_bundles` column, and the
-plot script groups the enabled and disabled results separately, including
-Forward+ and clustered deferred. Compare median CPU draw/submit duration and
-frame interval; do not interpret either as GPU-only execution time. No
-render-bundle timing results are filled in until measured on the target system.
+build label unchanged. Select **Forward+ vs clustered deferred** in the
+benchmark's renderer-set control, run once with render bundles enabled and
+again with them disabled, and download each CSV. Rows contain a
+`render_bundles` column, and the plot script groups enabled and disabled
+results separately. Compare median CPU draw/submit duration and frame
+interval; do not interpret either as GPU-only execution time. A 10-sample
+pilot is summarized in the performance analysis above; repeat with the
+recommended warm-up/sample settings on the target system.
 
 #### Forward+ depth prepass and cluster culling
 
@@ -141,6 +268,10 @@ browser user agent, render-bundle and Forward+ depth optimization states, frame
 interval, and CPU draw/submit duration. The default is a 3-second warm-up and
 300 samples per renderer.
 
+Use **Hide** on the benchmark panel to clear it from screenshots and recordings.
+Press **B** while the page is not focused on a text or select field to show or
+hide the panel again.
+
 Frame interval is measured between animation frames and includes browser
 scheduling/vsync. CPU draw/submit measures JavaScript command encoding and
 submission; it does **not** measure asynchronous GPU execution. Use browser GPU
@@ -164,14 +295,3 @@ milliseconds, and plots median plus interquartile range for both frame interval
 and CPU draw/submit duration. It groups data by build label, renderer, bundle
 state, and Forward+ depth optimization state, so enabled and disabled runs can
 be compared in one plot.
-
-#### Performance measurements
-
-No target-machine benchmark data has been collected yet. The CSV exports and
-plot provide the measurements; do not treat the G-buffer memory reduction
-below as a render-time result.
-
-| Version | G-buffer color storage | Average GPU frame time (ms) | Median GPU frame time (ms) |
-| --- | ---: | ---: | ---: |
-| Original clustered deferred | 20 B/pixel | Not measured | Not measured |
-| Compact G-buffer + compute | 8 B/pixel | Not measured | Not measured |
