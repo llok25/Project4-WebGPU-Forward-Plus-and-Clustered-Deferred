@@ -14,7 +14,8 @@ https://llok25.github.io/Project4-WebGPU-Forward-Plus-and-Clustered-Deferred/
 
 ### Demo Video/GIF
 
-[![](img/video.mp4)](TODO)
+https://github.com/user-attachments/assets/0ea65a03-dcf8-42ba-897a-fa2212da1541
+
 
 ### (TODO: Your README)
 
