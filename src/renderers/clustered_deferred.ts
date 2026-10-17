@@ -1,6 +1,7 @@
 import * as renderer from '../renderer';
 import * as shaders from '../shaders/shaders';
 import { Stage } from '../stage/stage';
+import { createSceneRenderBundle, encodeSceneDraws } from './scene_draw';
 
 export class ClusteredDeferredRenderer extends renderer.Renderer {
     private gbufferSceneBindGroupLayout: GPUBindGroupLayout;
@@ -19,6 +20,7 @@ export class ClusteredDeferredRenderer extends renderer.Renderer {
     private depthTextureView: GPUTextureView;
 
     private gbufferPipeline: GPURenderPipeline;
+    private gbufferRenderBundle: GPURenderBundle;
     private lightingPipeline: GPUComputePipeline;
     private bloomDownsamplePipeline: GPUComputePipeline;
     private bloomCompositePipeline: GPUComputePipeline;
@@ -184,6 +186,13 @@ export class ClusteredDeferredRenderer extends renderer.Renderer {
             }
         });
 
+        this.gbufferRenderBundle = createSceneRenderBundle(
+            this.scene,
+            this.gbufferPipeline,
+            this.gbufferSceneBindGroup,
+            "rg32uint"
+        );
+
         this.lightingPipeline = renderer.device.createComputePipeline({
             label: "deferred compute lighting pipeline",
             layout: renderer.device.createPipelineLayout({
@@ -250,17 +259,11 @@ export class ClusteredDeferredRenderer extends renderer.Renderer {
             }
         });
 
-        gbufferPass.setPipeline(this.gbufferPipeline);
-        gbufferPass.setBindGroup(shaders.constants.bindGroup_scene, this.gbufferSceneBindGroup);
-        this.scene.iterate(node => {
-            gbufferPass.setBindGroup(shaders.constants.bindGroup_model, node.modelBindGroup);
-        }, material => {
-            gbufferPass.setBindGroup(shaders.constants.bindGroup_material, material.materialBindGroup);
-        }, primitive => {
-            gbufferPass.setVertexBuffer(0, primitive.vertexBuffer);
-            gbufferPass.setIndexBuffer(primitive.indexBuffer, 'uint32');
-            gbufferPass.drawIndexed(primitive.numIndices);
-        });
+        if (renderer.renderBundlesEnabled) {
+            gbufferPass.executeBundles([this.gbufferRenderBundle]);
+        } else {
+            encodeSceneDraws(gbufferPass, this.scene, this.gbufferPipeline, this.gbufferSceneBindGroup);
+        }
         gbufferPass.end();
 
         const lightingBindGroup = renderer.device.createBindGroup({

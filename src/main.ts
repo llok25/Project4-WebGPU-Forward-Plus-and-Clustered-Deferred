@@ -1,7 +1,7 @@
 import Stats from 'stats.js';
 import { GUI } from 'dat.gui';
 
-import { initWebGPU, Renderer } from './renderer';
+import { initWebGPU, Renderer, renderBundlesEnabled, setRenderBundlesEnabled } from './renderer';
 import { NaiveRenderer } from './renderers/naive';
 import { ForwardPlusRenderer } from './renderers/forward_plus';
 import { ClusteredDeferredRenderer } from './renderers/clustered_deferred';
@@ -29,6 +29,8 @@ const gui = new GUI();
 gui.add(lights, 'numLights').min(1).max(Lights.maxNumLights).step(1).onChange(() => {
     lights.updateLightSetUniformNumLights();
 });
+const renderBundleSettings = { enabled: renderBundlesEnabled };
+gui.add(renderBundleSettings, 'enabled').name('render bundles').onChange(setRenderBundlesEnabled);
 
 const stage = new Stage(scene, lights, camera, stats);
 
@@ -69,5 +71,7 @@ new RendererBenchmark(
     () => renderModeController.getValue(),
     listener => { benchmarkMetricsListener = listener; },
     lights,
-    rendererModes
+    () => renderBundlesEnabled,
+    rendererModes,
+    mode => mode !== renderModes.naive
 );

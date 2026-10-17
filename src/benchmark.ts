@@ -12,6 +12,7 @@ type BenchmarkRow = {
     sample_index: number;
     frame_interval_ms: number;
     cpu_submit_ms: number;
+    render_bundles: string;
     num_lights: number;
     width_px: number;
     height_px: number;
@@ -49,7 +50,9 @@ export class RendererBenchmark {
             listener: ((mode: string, metrics: FrameMetrics) => void) | undefined
         ) => void,
         private readonly lights: Lights,
-        private readonly modes: string[]
+        private readonly getRenderBundlesEnabled: () => boolean,
+        private readonly modes: string[],
+        private readonly bundlesSupported: (mode: string) => boolean
     ) {
         this.startButton.addEventListener('click', () => { void this.run(); });
         this.stopButton.addEventListener('click', () => this.stop());
@@ -74,6 +77,9 @@ export class RendererBenchmark {
             sample_index: sampleIndex,
             frame_interval_ms: metrics.frameIntervalMs,
             cpu_submit_ms: metrics.cpuSubmitMs,
+            render_bundles: this.bundlesSupported(mode)
+                ? (this.getRenderBundlesEnabled() ? 'enabled' : 'disabled')
+                : 'unsupported',
             num_lights: this.lights.numLights,
             width_px: canvas.width,
             height_px: canvas.height,
@@ -194,7 +200,7 @@ export class RendererBenchmark {
 
         const headers: (keyof BenchmarkRow)[] = [
             'version', 'run_id', 'mode', 'sample_index', 'frame_interval_ms',
-            'cpu_submit_ms', 'num_lights', 'width_px', 'height_px',
+            'cpu_submit_ms', 'render_bundles', 'num_lights', 'width_px', 'height_px',
             'timestamp_utc', 'user_agent'
         ];
         const escapeCell = (value: string | number) =>

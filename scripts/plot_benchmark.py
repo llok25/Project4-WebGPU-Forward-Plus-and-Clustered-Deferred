@@ -41,7 +41,8 @@ def read_files(paths):
                 mode = (row.get("mode") or "").strip()
                 if not version or not mode:
                     raise ValueError(f"{path}:{line_number}: version and mode cannot be blank")
-                key = (version, mode)
+                bundle_state = (row.get("render_bundles") or "unspecified").strip() or "unspecified"
+                key = (version, mode, bundle_state)
                 for metric, _ in METRICS:
                     try:
                         value = float(row[metric])
@@ -69,12 +70,12 @@ def main():
     except (OSError, csv.Error, ValueError) as error:
         parser.error(str(error))
 
-    print("Version | Renderer | Metric | Samples | Mean | Median | P95 (ms)")
-    for version, mode in sorted(groups):
+    print("Version | Renderer | Bundles | Metric | Samples | Mean | Median | P95 (ms)")
+    for version, mode, bundle_state in sorted(groups):
         for metric, label in METRICS:
-            values = groups[(version, mode)][metric]
+            values = groups[(version, mode, bundle_state)][metric]
             print(
-                f"{version} | {mode} | {label} | {len(values)} | "
+                f"{version} | {mode} | {bundle_state} | {label} | {len(values)} | "
                 f"{statistics.fmean(values):.3f} | {statistics.median(values):.3f} | "
                 f"{percentile(values, 0.95):.3f}"
             )
@@ -85,11 +86,11 @@ def main():
         print("Install matplotlib to create the plot: python -m pip install matplotlib", file=sys.stderr)
         return 2
 
-    versions = sorted({version for version, _ in groups})
-    modes = sorted({mode for _, mode in groups})
-    combinations = [(version, mode) for version in versions for mode in modes if (version, mode) in groups]
-    labels = [f"{version}\n{mode}" for version, mode in combinations]
+    versions = sorted({version for version, _, _ in groups})
+    combinations = sorted(groups)
+    labels = [f"{version}\n{mode}\nBundles: {bundle_state}" for version, mode, bundle_state in combinations]
     colors_by_version = {version: f"C{index % 10}" for index, version in enumerate(versions)}
+    hatches = {"enabled": "", "disabled": "///", "unsupported": "..."}
 
     figure, axes = plt.subplots(1, len(METRICS), figsize=(7 * len(METRICS), 5), squeeze=False)
     for axis, (metric, title) in zip(axes[0], METRICS):
@@ -97,8 +98,9 @@ def main():
         lower_errors = []
         upper_errors = []
         colors = []
-        for version, mode in combinations:
-            values = groups[(version, mode)][metric]
+        metric_hatches = []
+        for version, mode, bundle_state in combinations:
+            values = groups[(version, mode, bundle_state)][metric]
             q1 = percentile(values, 0.25)
             median = statistics.median(values)
             q3 = percentile(values, 0.75)
@@ -106,8 +108,11 @@ def main():
             lower_errors.append(median - q1)
             upper_errors.append(q3 - median)
             colors.append(colors_by_version[version])
+            metric_hatches.append(hatches.get(bundle_state, ""))
 
-        axis.bar(range(len(combinations)), medians, color=colors)
+        bars = axis.bar(range(len(combinations)), medians, color=colors)
+        for bar, hatch in zip(bars, metric_hatches):
+            bar.set_hatch(hatch)
         axis.errorbar(
             range(len(combinations)), medians, yerr=[lower_errors, upper_errors],
             fmt="none", ecolor="black", capsize=3,

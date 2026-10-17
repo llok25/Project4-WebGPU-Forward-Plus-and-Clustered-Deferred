@@ -8,6 +8,11 @@ export var canvasFormat: GPUTextureFormat;
 export var context: GPUCanvasContext;
 export var device: GPUDevice;
 export var canvasTextureView: GPUTextureView;
+export let renderBundlesEnabled = true;
+
+export function setRenderBundlesEnabled(enabled: boolean) {
+    renderBundlesEnabled = enabled;
+}
 
 export var aspectRatio: number;
 export const fovYDegrees = 45;

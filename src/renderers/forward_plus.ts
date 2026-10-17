@@ -1,6 +1,7 @@
 import * as renderer from '../renderer';
 import * as shaders from '../shaders/shaders';
 import { Stage } from '../stage/stage';
+import { createSceneRenderBundle, encodeSceneDraws } from './scene_draw';
 
 export class ForwardPlusRenderer extends renderer.Renderer {
     private sceneBindGroupLayout: GPUBindGroupLayout;
@@ -8,6 +9,7 @@ export class ForwardPlusRenderer extends renderer.Renderer {
     private depthTexture: GPUTexture;
     private depthTextureView: GPUTextureView;
     private pipeline: GPURenderPipeline;
+    private sceneRenderBundle: GPURenderBundle;
 
     constructor(stage: Stage) {
         super(stage);
@@ -87,6 +89,13 @@ export class ForwardPlusRenderer extends renderer.Renderer {
                 targets: [{ format: renderer.canvasFormat }]
             }
         });
+
+        this.sceneRenderBundle = createSceneRenderBundle(
+            this.scene,
+            this.pipeline,
+            this.sceneBindGroup,
+            renderer.canvasFormat
+        );
     }
 
     override draw() {
@@ -112,17 +121,11 @@ export class ForwardPlusRenderer extends renderer.Renderer {
             }
         });
 
-        renderPass.setPipeline(this.pipeline);
-        renderPass.setBindGroup(shaders.constants.bindGroup_scene, this.sceneBindGroup);
-        this.scene.iterate(node => {
-            renderPass.setBindGroup(shaders.constants.bindGroup_model, node.modelBindGroup);
-        }, material => {
-            renderPass.setBindGroup(shaders.constants.bindGroup_material, material.materialBindGroup);
-        }, primitive => {
-            renderPass.setVertexBuffer(0, primitive.vertexBuffer);
-            renderPass.setIndexBuffer(primitive.indexBuffer, 'uint32');
-            renderPass.drawIndexed(primitive.numIndices);
-        });
+        if (renderer.renderBundlesEnabled) {
+            renderPass.executeBundles([this.sceneRenderBundle]);
+        } else {
+            encodeSceneDraws(renderPass, this.scene, this.pipeline, this.sceneBindGroup);
+        }
         renderPass.end();
 
         renderer.device.queue.submit([encoder.finish()]);
