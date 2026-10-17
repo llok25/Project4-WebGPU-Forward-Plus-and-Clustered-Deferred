@@ -9,7 +9,7 @@ WebGL Forward+ and Clustered Deferred Shading
 
 ### Live Demo
 
-[![](img/thumb.png)](https://llok25.github.io/Project4-WebGPU-Forward-Plus-and-Clustered-Deferred/)
+[(img/thumb.png)](https://llok25.github.io/Project4-WebGPU-Forward-Plus-and-Clustered-Deferred/)
 
 ### Demo Video/GIF
 
@@ -31,7 +31,6 @@ to implementation work. Complete the implementation early to leave time!
 - [stats.js](https://github.com/mrdoob/stats.js)
 - [wgpu-matrix](https://github.com/greggman/wgpu-matrix)
 
-## Performance Analysis
 
 ### Forward+ vs clustered deferred
 
@@ -40,8 +39,9 @@ lights with the same Sponza view, 1058x567 canvas, 3-second warm-up, and 200
 samples per renderer. Render bundles were enabled for both. Forward+ depth
 prepass and depth-based cluster culling were enabled for Forward+. Clustered
 deferred includes compact G-buffer compute shading and bloom. The browser was
-Chrome 150 embedded in VS Code/Electron 43.7.7; GPU model and driver were not
-recorded, so these measurements are environment-specific.
+Chrome 150 embedded in VS Code/Electron 43.7.7. The adapter for this original
+batch was not recorded; its results are environment-specific and superseded
+where the new timestamped light sweep below overlaps.
 
 | Lights | Renderer | Frame interval mean (ms) | Frame interval median (ms) | CPU draw/submit mean (ms) | CPU draw/submit median (ms) |
 | ---: | --- | ---: | ---: | ---: | ---: |
@@ -264,19 +264,26 @@ The in-app **Renderer benchmark** runs the naive, Forward+, and clustered
 deferred renderers in sequence. It discards the configured warm-up period,
 collects the requested number of frame samples per renderer, and exports a CSV.
 Each row includes the build label, renderer, light count, canvas resolution,
-browser user agent, render-bundle and Forward+ depth optimization states, frame
-interval, and CPU draw/submit duration. The default is a 3-second warm-up and
-300 samples per renderer.
+browser user agent, experiment name, render-bundle and Forward+ depth
+optimization states, frame interval, CPU draw/submit duration, adapter
+metadata, timestamp-query support, and available per-pass GPU timestamps. The
+default is a 3-second warm-up and 200 samples per configuration.
 
-Use **Hide** on the benchmark panel to clear it from screenshots and recordings.
-Press **B** while the page is not focused on a text or select field to show or
-hide the panel again.
+Choose an **Experiment** preset to run the seven-point light sweep, Forward+
+depth on/off at 2,000 and 5,000 lights, or render-bundle on/off for both
+renderers at 2,000 lights. Each CSV row includes the active configuration.
+
+Use the **×** control on the benchmark panel to clear it from screenshots and
+recordings. Press **B** while the page is not focused on a text or select field
+to show or hide the panel again.
 
 Frame interval is measured between animation frames and includes browser
 scheduling/vsync. CPU draw/submit measures JavaScript command encoding and
-submission; it does **not** measure asynchronous GPU execution. Use browser GPU
-profiling or GPU timestamp queries separately when actual GPU-only timings are
-required. The tool reports milliseconds, not FPS.
+submission; it does **not** measure asynchronous GPU execution. When the
+adapter supports `timestamp-query`, the CSV also records per-pass GPU timings
+for clustering, Forward+ depth/mask/shading, deferred G-buffer/lighting, and
+bloom. These are per-pass durations, not total frame GPU time. The tool
+reports milliseconds, not FPS.
 
 For comparable runs, keep the browser/GPU, canvas size, camera position, light
 count, and power mode constant; avoid interacting with the page and keep it
@@ -292,7 +299,10 @@ python scripts/plot_benchmark.py baseline.csv compact-compute.csv --output bench
 
 The script prints sample count, mean, median, and 95th percentile in
 milliseconds, and plots median plus interquartile range for both frame interval
-and CPU draw/submit duration. It groups data by build label, renderer, bundle
-state, and Forward+ depth optimization state, so enabled and disabled runs can
-be compared in one plot.
+and CPU draw/submit duration. It groups data by experiment, build label,
+renderer, light count, bundle state, and Forward+ depth optimization state.
+To recreate the dedicated sweep charts:
 
+```powershell
+python scripts/plot_benchmark_sweeps.py --light-sweep result\renderer-light-sweep.csv --depth-csv result\renderer-depth-comparison.csv --bundles-csv result\renderer-bundles-comparison.csv --output-dir result
+```
