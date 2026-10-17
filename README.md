@@ -85,14 +85,61 @@ Forward+ and clustered deferred. Compare median CPU draw/submit duration and
 frame interval; do not interpret either as GPU-only execution time. No
 render-bundle timing results are filled in until measured on the target system.
 
+#### Forward+ depth prepass and cluster culling
+
+Forward+ first renders alpha-tested geometry to a depth-only attachment. Its
+lighting pass then loads that depth and uses an `equal` depth test with depth
+writes disabled, so occluded fragments are rejected before the expensive
+Forward+ fragment shader. Alpha testing is retained in the depth pass so cutout
+materials do not incorrectly occlude geometry behind them.
+
+Between the prepass and light clustering, a fullscreen-triangle pass reads
+depth. Each covered pixel reconstructs view depth, derives its tile and
+logarithmic depth slice, and atomically marks that cluster active. The cluster
+compute shader checks the mask before calculating bounds or testing lights.
+This is direct mask-based skipping: dispatch count remains unchanged, and there
+is no stream compaction. Other renderers use a separate all-active mask.
+
+Depth culling is most useful when many tile/depth clusters are empty and the
+scene has substantial overdraw. The compute shader then avoids scanning lights
+for those clusters, and the final shading pass shades only the visible depth
+surface. It can be less useful when most clusters contain geometry or light
+counts are small, since the extra depth draw, fullscreen mask atomics, and
+buffer clear have a cost. The active set is conservative only to the pixel
+coverage recorded by the depth prepass, with one cluster marked for each
+visible pixel.
+
+Use the **Forward+ depth optimizations** GUI checkbox to compare the original
+single-pass Forward+ path with prepass plus depth-based culling in the same
+build. Run the benchmark under both settings, then plot the CSV exports
+together. The `forward_plus_depth` column distinguishes settings. Evaluate
+more than one light count and scene/camera view: the optimization adds
+fixed per-pixel and per-geometry work while saving light tests in inactive
+clusters. Initial measurements from this workspace session follow.
+
+Initial same-session measurements (200 samples per renderer after a 2-second
+warm-up, 500 lights, 1058x567 canvas, render bundles enabled, Chrome 150 inside
+VS Code/Electron) are below. Frame interval is wall-clock time between frames,
+and CPU submit is command encoding plus submission; neither is GPU-only time.
+The medians are unchanged at 6.10 ms, so this run does not show a measurable
+frame-interval improvement. CPU submit was lower in this run, but sub-millisecond
+measurements in a shared browser session are susceptible to noise and should
+be rechecked on the target system.
+
+| Forward+ depth path | Frame interval mean (ms) | Frame interval median (ms) | CPU submit mean (ms) | CPU submit median (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| Disabled (single pass) | 6.394 | 6.100 | 0.157 | 0.200 |
+| Enabled (prepass + culling) | 6.060 | 6.100 | 0.122 | 0.100 |
+
 #### Automated benchmark
 
 The in-app **Renderer benchmark** runs the naive, Forward+, and clustered
 deferred renderers in sequence. It discards the configured warm-up period,
 collects the requested number of frame samples per renderer, and exports a CSV.
 Each row includes the build label, renderer, light count, canvas resolution,
-browser user agent, render-bundle state, frame interval, and CPU draw/submit
-duration. The default is a 3-second warm-up and 300 samples per renderer.
+browser user agent, render-bundle and Forward+ depth optimization states, frame
+interval, and CPU draw/submit duration. The default is a 3-second warm-up and
+300 samples per renderer.
 
 Frame interval is measured between animation frames and includes browser
 scheduling/vsync. CPU draw/submit measures JavaScript command encoding and
@@ -114,8 +161,9 @@ python scripts/plot_benchmark.py baseline.csv compact-compute.csv --output bench
 
 The script prints sample count, mean, median, and 95th percentile in
 milliseconds, and plots median plus interquartile range for both frame interval
-and CPU draw/submit duration. It groups data by build label, renderer, and
-bundle state, so enabled and disabled runs can be compared in one plot.
+and CPU draw/submit duration. It groups data by build label, renderer, bundle
+state, and Forward+ depth optimization state, so enabled and disabled runs can
+be compared in one plot.
 
 #### Performance measurements
 

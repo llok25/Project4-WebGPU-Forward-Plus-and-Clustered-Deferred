@@ -1,7 +1,14 @@
 import Stats from 'stats.js';
 import { GUI } from 'dat.gui';
 
-import { initWebGPU, Renderer, renderBundlesEnabled, setRenderBundlesEnabled } from './renderer';
+import {
+    initWebGPU,
+    Renderer,
+    renderBundlesEnabled,
+    forwardPlusDepthOptimizationEnabled,
+    setRenderBundlesEnabled,
+    setForwardPlusDepthOptimizationEnabled
+} from './renderer';
 import { NaiveRenderer } from './renderers/naive';
 import { ForwardPlusRenderer } from './renderers/forward_plus';
 import { ClusteredDeferredRenderer } from './renderers/clustered_deferred';
@@ -31,6 +38,9 @@ gui.add(lights, 'numLights').min(1).max(Lights.maxNumLights).step(1).onChange(()
 });
 const renderBundleSettings = { enabled: renderBundlesEnabled };
 gui.add(renderBundleSettings, 'enabled').name('render bundles').onChange(setRenderBundlesEnabled);
+const depthOptimizationSettings = { enabled: forwardPlusDepthOptimizationEnabled };
+gui.add(depthOptimizationSettings, 'enabled').name('Forward+ depth optimizations')
+    .onChange(setForwardPlusDepthOptimizationEnabled);
 
 const stage = new Stage(scene, lights, camera, stats);
 
@@ -72,6 +82,7 @@ new RendererBenchmark(
     listener => { benchmarkMetricsListener = listener; },
     lights,
     () => renderBundlesEnabled,
+    () => forwardPlusDepthOptimizationEnabled,
     rendererModes,
     mode => mode !== renderModes.naive
 );

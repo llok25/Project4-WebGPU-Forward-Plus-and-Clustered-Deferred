@@ -1,6 +1,7 @@
 @group(0) @binding(0) var<storage, read> lightSet: LightSet;
 @group(0) @binding(1) var<uniform> cameraUniforms: CameraUniforms;
 @group(0) @binding(2) var<storage, read_write> clusterSet: ClusterSet;
+@group(0) @binding(3) var<storage, read_write> activeClusterMask: array<atomic<u32>>;
 
 const TILE_SIZE = ${clusterTileSize}u;
 const DEPTH_SLICES = ${clusterDepthSlices}u;
@@ -16,6 +17,12 @@ fn main(@builtin(global_invocation_id) globalId: vec3u) {
     let totalClusters = clustersPerLayer * DEPTH_SLICES;
     let clusterIdx = globalId.x;
     if (clusterIdx >= totalClusters) {
+        return;
+    }
+    let clusterStride = MAX_LIGHTS_PER_CLUSTER + 1u;
+    let clusterBase = clusterIdx * clusterStride;
+    if (atomicLoad(&activeClusterMask[clusterIdx]) == 0u) {
+        clusterSet.data[clusterBase] = 0u;
         return;
     }
 
@@ -58,8 +65,6 @@ fn main(@builtin(global_invocation_id) globalId: vec3u) {
     let boundsMin = vec3f(xMin, yMin, -farDepth);
     let boundsMax = vec3f(xMax, yMax, -nearDepth);
 
-    let clusterStride = MAX_LIGHTS_PER_CLUSTER + 1u;
-    let clusterBase = clusterIdx * clusterStride;
     var lightCount = 0u;
     var overflow = false;
     for (var lightIdx = 0u; lightIdx < lightSet.numLights; lightIdx++) {

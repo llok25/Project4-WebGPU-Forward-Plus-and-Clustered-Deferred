@@ -13,6 +13,7 @@ type BenchmarkRow = {
     frame_interval_ms: number;
     cpu_submit_ms: number;
     render_bundles: string;
+    forward_plus_depth: string;
     num_lights: number;
     width_px: number;
     height_px: number;
@@ -30,6 +31,7 @@ export class RendererBenchmark {
     private readonly samplesInput = document.querySelector<HTMLInputElement>('#benchmark-samples')!;
 
     private readonly rows: BenchmarkRow[] = [];
+    private readonly modeSummaries: string[] = [];
     private readonly runId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     private activeMode: string | undefined;
     private activeRows: BenchmarkRow[] = [];
@@ -51,6 +53,7 @@ export class RendererBenchmark {
         ) => void,
         private readonly lights: Lights,
         private readonly getRenderBundlesEnabled: () => boolean,
+        private readonly getForwardPlusDepthEnabled: () => boolean,
         private readonly modes: string[],
         private readonly bundlesSupported: (mode: string) => boolean
     ) {
@@ -80,6 +83,9 @@ export class RendererBenchmark {
             render_bundles: this.bundlesSupported(mode)
                 ? (this.getRenderBundlesEnabled() ? 'enabled' : 'disabled')
                 : 'unsupported',
+            forward_plus_depth: mode === 'forward+'
+                ? (this.getForwardPlusDepthEnabled() ? 'enabled' : 'disabled')
+                : 'not-applicable',
             num_lights: this.lights.numLights,
             width_px: canvas.width,
             height_px: canvas.height,
@@ -119,6 +125,7 @@ export class RendererBenchmark {
 
         const previousMode = this.getMode();
         this.currentVersion = version;
+        this.modeSummaries.length = 0;
         this.warmupMs = warmupSeconds * 1000;
         this.targetSamples = sampleCount;
         this.currentRunId = this.runId();
@@ -167,13 +174,29 @@ export class RendererBenchmark {
             if (this.stopped) {
                 this.status.value = `Stopped. Recorded ${this.rows.length} samples; download the CSV.`;
             } else if (!this.modeError) {
-                this.status.value = `Done. Recorded ${this.rows.length} samples; download the CSV.`;
+                this.status.value = [
+                    `Done. Recorded ${this.rows.length} samples; download the CSV.`,
+                    ...this.modeSummaries
+                ].join('\n');
             }
             this.modeError = undefined;
         }
     }
 
     private finishCurrentMode() {
+        if (this.activeMode && this.activeRows.length === this.targetSamples) {
+            const describe = (key: 'frame_interval_ms' | 'cpu_submit_ms') => {
+                const values = this.activeRows.map(row => row[key]).sort((a, b) => a - b);
+                const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+                const median = values[Math.floor(values.length / 2)];
+                return `mean ${mean.toFixed(3)} ms, median ${median.toFixed(3)} ms`;
+            };
+            const latest = this.activeRows[this.activeRows.length - 1];
+            this.modeSummaries.push(
+                `${this.activeMode} (bundles ${latest.render_bundles}, depth ${latest.forward_plus_depth}): ` +
+                `frame interval ${describe('frame_interval_ms')}; CPU submit ${describe('cpu_submit_ms')}`
+            );
+        }
         if (this.modeTimeout !== undefined) {
             window.clearTimeout(this.modeTimeout);
             this.modeTimeout = undefined;
@@ -200,7 +223,8 @@ export class RendererBenchmark {
 
         const headers: (keyof BenchmarkRow)[] = [
             'version', 'run_id', 'mode', 'sample_index', 'frame_interval_ms',
-            'cpu_submit_ms', 'render_bundles', 'num_lights', 'width_px', 'height_px',
+            'cpu_submit_ms', 'render_bundles', 'forward_plus_depth',
+            'num_lights', 'width_px', 'height_px',
             'timestamp_utc', 'user_agent'
         ];
         const escapeCell = (value: string | number) =>

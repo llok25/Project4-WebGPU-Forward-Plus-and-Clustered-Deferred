@@ -9,9 +9,14 @@ export var context: GPUCanvasContext;
 export var device: GPUDevice;
 export var canvasTextureView: GPUTextureView;
 export let renderBundlesEnabled = true;
+export let forwardPlusDepthOptimizationEnabled = true;
 
 export function setRenderBundlesEnabled(enabled: boolean) {
     renderBundlesEnabled = enabled;
+}
+
+export function setForwardPlusDepthOptimizationEnabled(enabled: boolean) {
+    forwardPlusDepthOptimizationEnabled = enabled;
 }
 
 export var aspectRatio: number;
@@ -141,7 +146,8 @@ export abstract class Renderer {
 
     // CHECKITOUT: this is the main rendering loop
     private onFrame(time: number) {
-        if (this.prevTime == 0) {
+        const isFirstFrame = this.prevTime === 0;
+        if (isFirstFrame) {
             this.prevTime = time;
         }
 
@@ -157,7 +163,7 @@ export abstract class Renderer {
 
         this.stats.end();
 
-        if (this.prevTime !== 0) {
+        if (!isFirstFrame) {
             this.onFrameMetrics?.({
                 frameIntervalMs: deltaTime,
                 cpuSubmitMs

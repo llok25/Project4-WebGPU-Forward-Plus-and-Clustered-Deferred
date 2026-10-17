@@ -32,11 +32,11 @@ export function createSceneRenderBundle(
     scene: Scene,
     pipeline: GPURenderPipeline,
     sceneBindGroup: GPUBindGroup,
-    colorFormat: GPUTextureFormat
+    colorFormat: GPUTextureFormat | null
 ): GPURenderBundle {
     const encoder = device.createRenderBundleEncoder({
         label: "static scene draw bundle",
-        colorFormats: [colorFormat],
+        colorFormats: colorFormat === null ? [] : [colorFormat],
         depthStencilFormat: "depth24plus"
     });
     encodeSceneDraws(encoder, scene, pipeline, sceneBindGroup);
