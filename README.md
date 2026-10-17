@@ -40,6 +40,28 @@ This project renders the Sponza atrium lit by thousands of dynamic point lights 
 
 ## Performance analysis
 
+### Naive vs Forward+ vs Clustered Deferred
+
+## Results (frame interval, ms)
+ 
+| Renderer | Mean | Median | p95 | Max | FPS (from median) |
+|---|---:|---:|---:|---:|---:|
+| Naive | 176.4 | 121.4 | 211.8 | 13,399.5 | 8.2 |
+| Naive (excluding one outlier) | 132.2 | 121.4 | 207.0 | n/a | 8.2 |
+| Forward+ | 17.6 | 18.1 | 36.4 | 60.7 | 55.3 |
+| Clustered Deferred | 11.5 | 12.0 | 24.2 | 30.4 | 83.3 |
+
+![Renderer frame interval 500 lights](.img/renderer_frame_interval_500_lights.png)
+ 
+## Analysis
+ 
+- **Naive is about 7× slower than Forward+ and 10× slower than Clustered Deferred** by median (121 vs 18 vs 12 ms). Even 500 lights is far too many for a loop over every light per fragment at this resolution. Its CPU submit time (0.18 ms) is no higher than the others', so the cost is entirely the GPU-side shader loop. The view-projection buffer and bind groups are not the bottleneck.
+- **One Naive sample is a 13.4-second stall** (sample 191), and it is what drags the mean to 176 ms. It is probably a tab hitch or GPU timeout rather than a renderer property, so I'd report the median or the trimmed mean (132 ms) and mention the exclusion.
+- **Clustering pays off at this resolution.** At 500 lights Forward+ was vsync-bound on the earlier 1058×782 run. At 1920×1032, about 2.5× the pixels, it no longer is, so you can finally see a real gap between the two clustered renderers.
+- **Clustered Deferred is about 33% faster than Forward+** (12.0 vs 18.1 ms median). That matches the 33–35% gap in the 2,000- and 5,000-light runs, which suggests the deferred advantage holds across light counts and resolutions. It also has tighter spread (p95 24 vs 36 ms).
+- **Forward+ drifts slower during the run.** The first 50 samples average 13.9 ms and the last 50 average 16.2 ms, which could be thermal throttling or the sampling window catching vsync quantization differently. Clustered Deferred and Naive stay flat. Worth repeating the Forward+ run to see whether it reproduces.
+ 
+
 ### Forward+ vs clustered deferred
 
 I compared the current implementations at 500, 2,000, and 5,000 moving point
